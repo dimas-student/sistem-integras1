@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  passwordHash String
+  firstName String
+  lastName  String
+  role      Role     @default(LEARNER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  enrollments Enrollment[]
+  submissions Submission[]
+  quizAttempts QuizAttempt[]
+  lessonsProgressTracking LessonProgress[]
+  instructedCourses Course[] @relation("CourseInstructor")
+
+  @@map("users")
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  instructorId String
+  instructor  User     @relation("CourseInstructor", fields: [instructorId], references: [id], onDelete: Cascade)
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  lessons     Lesson[]
+  enrollments Enrollment[]
+  quizzes     Quiz[]
+  submissions Submission[]
+
+  @@map("courses")
+}
+
+model Lesson {
+  id          String   @id @default(cuid())
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  contentUrl  String?
+  duration    Int      @default(0)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  progressTracking LessonProgress[]
+
+  @@map("lessons")
+  @@index([courseId])
+}
+
+model Enrollment {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  enrolledAt  DateTime @default(now())
+  completedAt DateTime?
+  status      EnrollmentStatus @default(ACTIVE)
+  
+  @@unique([userId, courseId])
+  @@map("enrollments")
+  @@index([userId])
+  @@index([courseId])
+}
+
+model LessonProgress {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId     String
+  lesson       Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  viewedDuration Int    @default(0)
+  isCompleted  Boolean  @default(false)
+  completedAt  DateTime?
+  updatedAt    DateTime @updatedAt
+  
+  @@unique([userId, lessonId])
+  @@map("lesson_progress")
+  @@index([userId])
+  @@index([lessonId])
+}
+
+model Quiz {
+  id          String   @id @default(cuid())
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  passingScore Int     @default(60)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  questions   QuizQuestion[]
+  attempts    QuizAttempt[]
+
+  @@map("quizzes")
+  @@index([courseId])
+}
+
+model QuizQuestion {
+  id           String   @id @default(cuid())
+  quizId       String
+  quiz         Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  type         QuestionType
+  prompt       String
+  options      Json?
+  correctAnswer String
+  order        Int      @default(0)
+  
+  @@map("quiz_questions")
+  @@index([quizId])
+}
+
+model QuizAttempt {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quizId      String
+  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  score       Int      @default(0)
+  passed      Boolean  @default(false)
+  responses   Json
+  submittedAt DateTime @default(now())
+  
+  @@map("quiz_attempts")
+  @@index([userId])
+  @@index([quizId])
+}
+
+model Submission {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId        String
+  course          Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  assignmentTitle String
+  fileUrl         String
+  submittedAt     DateTime @default(now())
+  feedback        String?
+  grade           Int?
+  updatedAt       DateTime @updatedAt
+  
+  @@map("submissions")
+  @@index([userId])
+  @@index([courseId])
+}
+
+enum Role {
+  ADMIN
+  INSTRUCTOR
+  LEARNER
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  DROPPED
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  SHORT_ANSWER
+  ESSAY
+}
